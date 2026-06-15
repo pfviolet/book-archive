@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>나의 독서 기록</title>
+<link rel="manifest" href="#" id="manifest-placeholder">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="독서기록">
+<script>
+const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#F5C842"/><text y="140" x="96" text-anchor="middle" font-size="120">📚</text></svg>`;
+const iconUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
+const link = document.createElement('link');
+link.rel = 'apple-touch-icon';
+link.href = iconUrl;
+document.head.appendChild(link);
+const manifest = { name: '나의 독서 기록', short_name: '독서기록', start_url: '.', display: 'standalone', background_color: '#FFFBF0', theme_color: '#F5C842', icons: [{ src: iconUrl, sizes: '192x192', type: 'image/svg+xml' }] };
+const mBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+document.getElementById('manifest-placeholder').href = URL.createObjectURL(mBlob);
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+:root{
+  --bg:#FFFBF0;--card:#FFFEF8;--card-b:#F0E8C8;--accent:#F5C842;--accent-l:#FEF9E0;--accent-b:#E8C93A;
+  --text:#3A3020;--sub:#7A6A40;--mute:#A89860;--green:#4CAF7D;--blue:#5B9BD5;--purple:#9B72CF;--gray:#B0A080;
+}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px 60px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 14px}
+.header h1{font-size:20px;font-weight:500}
+.add-btn{background:var(--accent);border:1px solid var(--accent-b);color:var(--text);padding:7px 16px;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer}
+.section{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.section-title{font-size:13px;font-weight:500;color:var(--sub);margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.book-card{cursor:pointer;background:var(--card);border:1px solid var(--card-b);border-radius:12px;overflow:hidden;transition:border-color .15s}
+.book-card:hover{border-color:var(--accent)}
+.book-thumb{width:100%;height:160px;background:var(--accent-l);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.book-thumb img{width:100%;height:100%;object-fit:cover}
+.book-thumb .no-img{font-size:36px;opacity:.4}
+.status-badge{position:absolute;top:6px;right:6px;color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.book-info{padding:8px 10px}
+.book-title{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-author{font-size:11px;color:var(--sub);margin-top:2px}
+.stars{display:flex;gap:2px;margin-top:4px;font-size:18px}
+.scroll-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.scroll-row .book-card{width:110px;flex-shrink:0}
+.scroll-row .book-thumb{height:148px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat-card{background:var(--accent-l);border:1px solid var(--card-b);border-radius:10px;padding:12px 14px}
+.stat-label{font-size:11px;color:var(--mute)}
+.stat-val{font-size:22px;font-weight:500;margin-top:4px}
+.cal-nav{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cal-nav button{background:none;border:none;cursor:pointer;color:var(--sub);font-size:18px;padding:2px 6px}
+.cal-nav span{font-size:14px;font-weight:500}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day-name{font-size:11px;color:var(--mute);text-align:center;padding:2px 0}
+.cal-day{font-size:12px;text-align:center;padding:4px 2px;border-radius:6px}
+.empty{text-align:center;padding:48px 16px;color:var(--mute)}
+.empty .emoji{font-size:40px;margin-bottom:10px}
+.empty p{font-size:15px;color:var(--sub);margin-bottom:6px}
+.empty small{font-size:13px}
+/* overlay */
+.overlay{position:fixed;inset:0;z-index:1000;background:rgba(58,48,32,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#FFFDF4;border-radius:18px;border:1.5px solid var(--card-b);width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal-body{padding:20px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-header h2{font-size:15px;font-weight:500}
+.close-btn{background:none;border:none;cursor:pointer;color:var(--mute);font-size:18px}
+.book-detail-top{display:flex;gap:14px;margin-bottom:16px}
+.book-cover-lg{width:88px;height:124px;flex-shrink:0;background:var(--accent-l);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.book-cover-lg img{width:100%;height:100%;object-fit:cover}
+input,textarea,select{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--card-b);background:var(--accent-l);color:var(--text);font-size:13px;margin-bottom:8px;font-family:inherit}
+textarea{resize:vertical}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.pill{padding:5px 13px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid var(--card-b);background:var(--card);color:var(--sub)}
+.pill.active-reading{border:1.5px solid #5B9BD5;background:#5B9BD522;color:#5B9BD5;font-weight:500}
+.pill.active-want{border:1.5px solid #9B72CF;background:#9B72CF22;color:#9B72CF;font-weight:500}
+.pill.active-done{border:1.5px solid #4CAF7D;background:#4CAF7D22;color:#4CAF7D;font-weight:500}
+.pill.active-stopped{border:1.5px solid #B0A080;background:#B0A08022;color:#B0A080;font-weight:500}
+.btn{padding:8px 16px;border-radius:10px;cursor:pointer;font-size:13px;border:1px solid var(--card-b);background:var(--card);color:var(--text);width:100%;margin-bottom:6px}
+.btn-primary{background:var(--accent);border-color:var(--accent-b);font-weight:500}
+.btn-option{padding:14px 16px;border-radius:12px;border:1px solid var(--card-b);background:var(--accent-l);color:var(--text);text-align:left;cursor:pointer;width:100%;margin-bottom:10px}
+.btn-option strong{display:block;font-size:14px;font-weight:500}
+.btn-option small{font-size:12px;color:var(--sub);margin-top:4px;display:block}
+.divider{border:none;border-top:1px solid var(--card-b);margin:14px 0}
+.note-type-row{display:flex;gap:6px;margin-bottom:8px}
+.note-pill{padding:4px 11px;font-size:12px;border-radius:20px;cursor:pointer;border:1px solid var(--card-b);background:var(--card);color:var(--sub)}
+.note-pill.active-quote{border:1.5px solid var(--purple);background:#9B72CF22;color:var(--purple)}
+.note-pill.active-thought{border:1.5px solid var(--green);background:#4CAF7D22;color:var(--green)}
+.note-item{background:var(--accent-l);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.note-meta{display:flex;gap:6px;align-items:center;margin-bottom:4px;font-size:11px}
+.note-text{font-size:13px;line-height:1.6}
+.search-row{display:flex;gap:6px;margin-bottom:12px}
+.search-row input{margin-bottom:0;flex:1}
+.search-row button{flex-shrink:0;padding:7px 14px;border-radius:8px;border:1px solid var(--card-b);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}
+.result-item{display:flex;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid var(--card-b);background:var(--card);margin-bottom:8px}
+.result-item.selected{border:1.5px solid var(--accent);background:var(--accent-l)}
+.result-thumb{width:38px;height:54px;background:var(--accent-l);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden}
+.result-thumb img{width:100%;height:100%;object-fit:cover}
+.result-list{max-height:260px;overflow-y:auto}
+.back-btn{background:none;border:none;cursor:pointer;color:var(--sub);font-size:13px;margin-bottom:10px;padding:0}
+.loading{text-align:center;padding:16px;font-size:13px;color:var(--mute)}
+/* confetti */
+.confetti-overlay{position:fixed;inset:0;z-index:9999;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.confetti-msg{background:#FFFDF4;border:2px solid var(--accent);border-radius:20px;padding:32px 48px;text-align:center;z-index:1;pointer-events:none}
+.confetti-msg .emoji{font-size:48px}
+.confetti-msg h2{font-size:22px;font-weight:500;margin-top:8px}
+.confetti-msg p{font-size:16px;color:var(--sub);margin-top:4px}
+.confetti-piece{position:absolute;top:-10px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>📚 나의 독서 기록</h1>
+    <button class="add-btn" onclick="openAdd()">+ 책 등록</button>
+  </div>
+  <div id="app-content"></div>
+</div>
+
+<!-- 책 등록 모달 -->
+<div class="overlay" id="add-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-body">
+      <div class="modal-header">
+        <h2>책 등록</h2>
+        <button class="close-btn" onclick="closeAdd()">✕</button>
+      </div>
+      <div id="add-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 책 상세 모달 -->
+<div class="overlay" id="book-modal" style="display:none" onclick="if(event.target===this)closeBook()">
+  <div class="modal">
+    <div class="modal-body" id="book-modal-body"></div>
+  </div>
+</div>
+
+<!-- 폭죽 -->
+<div class="confetti-overlay" id="confetti" style="display:none">
+  <div class="confetti-msg">
+    <div class="emoji">🎉</div>
+    <h2>칭찬합니다!</h2>
+    <p>잘하셨어요 👏</p>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDocs, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAIhC2ihaFLjngYz5KUuO3W72Q_wfQqD78",
+  authDomain: "my-book-archive-5638e.firebaseapp.com",
+  projectId: "my-book-archive-5638e",
+  storageBucket: "my-book-archive-5638e.firebasestorage.app",
+  messagingSenderId: "209419055584",
+  appId: "1:209419055584:web:67182b237236840d14bb85"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let books = [];
+let notes = {};
+let readDates = [];
+let addMode = null;
+let addSelected = null;
+let addStatus = "want";
+let addManual = { title:"", author:"", publisher:"", cover:"" };
+let activeBookId = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+const STATUS_COLOR = { reading:"#5B9BD5", want:"#9B72CF", done:"#4CAF7D", stopped:"#B0A080" };
+const STATUS_LABEL = { reading:"읽는 중", want:"읽고 싶음", done:"다 읽음", stopped:"중단" };
+
+// Firebase 실시간 동기화
+onSnapshot(collection(db, "books"), snap => {
+  books = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  render();
+});
+onSnapshot(collection(db, "notes"), snap => {
+  notes = {};
+  snap.docs.forEach(d => { notes[d.id] = d.data().list || []; });
+  if (activeBookId) renderBookModal(activeBookId);
+});
+onSnapshot(doc(db, "meta", "readDates"), snap => {
+  readDates = snap.exists() ? (snap.data().dates || []) : [];
+  render();
+});
+
+async function saveBook(book) {
+  await setDoc(doc(db, "books", String(book.id)), book);
+}
+async function updateBook(id, updates) {
+  const prev = books.find(b => b.id === id);
+  if (updates.status === "done" && prev?.status !== "done") showConfetti();
+  if (updates.status === "reading") {
+    const today = new Date().toISOString().slice(0,10);
+    if (!readDates.includes(today)) {
+      const newDates = [...readDates, today];
+      await setDoc(doc(db, "meta", "readDates"), { dates: newDates });
+    }
+  }
+  await updateDoc(doc(db, "books", String(id)), updates);
+}
+async function saveNote(bookId, note) {
+  const prev = notes[bookId] || [];
+  const newList = [...prev, note];
+  await setDoc(doc(db, "notes", String(bookId)), { list: newList });
+}
+
+function stars(val, editable, bookId) {
+  return [1,2,3,4,5].map(s =>
+    `<span onclick="${editable ? `rateBook('${bookId}',${s})` : ''}" style="font-size:20px;cursor:${editable?'pointer':'default'};color:${s<=val?'#F5C842':'#D9CCAA'}"">★</span>`
+  ).join('');
+}
+
+function statusBadge(s) {
+  return `<div class="status-badge" style="background:${STATUS_COLOR[s]}">${STATUS_LABEL[s]}</div>`;
+}
+
+function bookCardHTML(b, compact) {
+  const h = compact ? 148 : 160;
+  return `<div class="book-card${compact?' compact':''}" onclick="openBook('${b.id}')">
+    <div class="book-thumb" style="height:${h}px">
+      ${b.cover ? `<img src="${b.cover}" onerror="this.style.display='none'">` : '<span class="no-img">📖</span>'}
+      ${statusBadge(b.status)}
+    </div>
+    <div class="book-info">
+      <div class="book-title">${b.title}</div>
+      ${b.author ? `<div class="book-author">${b.author}</div>` : ''}
+      ${b.rating > 0 ? `<div class="stars">${stars(b.rating, false, b.id)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const reading = books.filter(b => b.status==="reading");
+  const want = books.filter(b => b.status==="want");
+  const done = books.filter(b => b.status==="done");
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthCount = readDates.filter(d => d.startsWith(thisMonth)).length;
+  const yearCount = readDates.filter(d => d.startsWith(String(now.getFullYear()))).length;
+
+  let html = '';
+  if (reading.length) html += `<div class="section"><div class="section-title">📖 읽는 중</div><div class="grid">${reading.map(b=>bookCardHTML(b,false)).join('')}</div></div>`;
+  if (want.length) html += `<div class="section"><div class="section-title">🔖 읽고 싶은 책</div><div class="grid">${want.map(b=>bookCardHTML(b,false)).join('')}</div></div>`;
+
+  html += `<div class="section"><div class="section-title">📅 독서 달력</div>${calHTML()}</div>`;
+  html += `<div class="section"><div class="section-title">📊 독서 통계</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">이번 달 독서일</div><div class="stat-val">${monthCount}일</div></div>
+      <div class="stat-card"><div class="stat-label">올해 독서일</div><div class="stat-val">${yearCount}일</div></div>
+      <div class="stat-card"><div class="stat-label">완독한 책</div><div class="stat-val">${done.length}권</div></div>
+    </div></div>`;
+
+  if (done.length) html += `<div class="section"><div class="section-title">✅ 다 읽은 책</div><div class="scroll-row">${done.map(b=>bookCardHTML(b,true)).join('')}</div></div>`;
+
+  if (!books.length) html = `<div class="empty"><div class="emoji">📚</div><p>아직 등록된 책이 없어요</p><small>+ 책 등록으로 첫 책을 추가해 보세요</small></div>`;
+
+  document.getElementById('app-content').innerHTML = html;
+}
+
+function calHTML() {
+  const now = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const months = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+  const dateSet = new Set(readDates);
+  let html = `<div class="cal-nav">
+    <button onclick="calPrev()">‹</button>
+    <span>${calYear}년 ${months[calMonth]}</span>
+    <button onclick="calNext()">›</button>
+  </div><div class="cal-grid">`;
+  ['일','월','화','수','목','금','토'].forEach(d => html += `<div class="cal-day-name">${d}</div>`);
+  for(let i=0;i<firstDay;i++) html += `<div></div>`;
+  for(let d=1;d<=daysInMonth;d++) {
+    const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isRead = dateSet.has(key);
+    const isToday = d===now.getDate()&&calMonth===now.getMonth()&&calYear===now.getFullYear();
+    html += `<div class="cal-day" style="background:${isRead?'#F5C842':isToday?'#FEF9E0':'transparent'};color:${isRead?'#3A3020':isToday?'#7A6A40':'#3A3020'};border:${isToday?'1px solid #E8C93A':'none'}">${d}</div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+window.calPrev = () => { if(calMonth===0){calMonth=11;calYear--;}else calMonth--; render(); };
+window.calNext = () => { if(calMonth===11){calMonth=0;calYear++;}else calMonth++; render(); };
+
+window.openAdd = () => {
+  addMode = null; addSelected = null; addStatus = "want";
+  addManual = { title:"", author:"", publisher:"", cover:"" };
+  renderAdd();
+  document.getElementById('add-modal').style.display = 'flex';
+};
+window.closeAdd = () => { document.getElementById('add-modal').style.display = 'none'; };
+
+function renderAdd() {
+  const el = document.getElementById('add-content');
+  if (!addMode) {
+    el.innerHTML = `
+      <button class="btn-option" onclick="setAddMode('search')"><strong>🔍 제목으로 검색</strong><small>AI가 한국 도서 정보를 찾아드려요</small></button>
+      <button class="btn-option" onclick="setAddMode('manual')"><strong>✏️ 직접 입력하기</strong><small>제목, 저자 등을 직접 입력합니다</small></button>`;
+    return;
+  }
+  if (addMode === 'search') {
+    el.innerHTML = `
+      <button class="back-btn" onclick="setAddMode(null)">← 뒤로</button>
+      <div class="search-row">
+        <input id="sq" placeholder="책 제목을 입력하세요" onkeydown="if(event.key==='Enter')doSearch()">
+        <button onclick="doSearch()">검색</button>
+      </div>
+      <div id="search-results"></div>
+      <div id="add-status-area" style="display:none"></div>`;
+    return;
+  }
+  if (addMode === 'manual') {
+    el.innerHTML = `
+      <button class="back-btn" onclick="setAddMode(null)">← 뒤로</button>
+      <input id="m-title" placeholder="제목 *" oninput="addManual.title=this.value">
+      <input id="m-author" placeholder="저자" oninput="addManual.author=this.value">
+      <input id="m-pub" placeholder="출판사" oninput="addManual.publisher=this.value">
+      <input id="m-cover" placeholder="표지 이미지 URL (선택)" oninput="addManual.cover=this.value">
+      ${statusPickerHTML()}
+      <button class="btn btn-primary" onclick="doAddManual()">등록하기</button>`;
+  }
+}
+
+function statusPickerHTML() {
+  return `<div style="font-size:11px;color:var(--mute);margin-bottom:6px">독서 상태</div>
+  <div class="pill-row">${Object.keys(STATUS_LABEL).map(k=>`<div class="pill${addStatus===k?' active-'+k:''}" onclick="setStatus('${k}')">${STATUS_LABEL[k]}</div>`).join('')}</div>`;
+}
+
+window.setAddMode = (m) => { addMode = m; renderAdd(); };
+window.setStatus = (s) => { addStatus = s; renderAdd(); };
+
+window.doSearch = async () => {
+  const q = document.getElementById('sq')?.value?.trim();
+  if (!q) return;
+  document.getElementById('search-results').innerHTML = '<div class="loading">검색 중...</div>';
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{ role:"user",
+        content:`한국 도서 검색: "${q}"\n다음 JSON 형식으로만 응답. 마크다운 없이 JSON만:\n[{"title":"제목","author":"저자","publisher":"출판사","cover":""}]\n실제 존재하는 한국 책 5권.` }] })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || "[]";
+    const results = JSON.parse(text.replace(/```json|```/g,"").trim());
+    if (!results.length) { document.getElementById('search-results').innerHTML = '<div class="loading">검색 결과가 없어요</div>'; return; }
+    let html = '<div class="result-list">';
+    results.forEach((r,i) => {
+      html += `<div class="result-item${addSelected?.title===r.title?' selected':''}" onclick="selectResult(${i})">
+        <div class="result-thumb">${r.cover?`<img src="${r.cover}">`:'📖'}</div>
+        <div><div style="font-size:13px;font-weight:500">${r.title}</div>${r.author?`<div style="font-size:12px;color:var(--sub)">${r.author}</div>`:''}${r.publisher?`<div style="font-size:11px;color:var(--mute)">${r.publisher}</div>`:''}</div>
+      </div>`;
+    });
+    html += '</div>';
+    window._searchResults = results;
+    document.getElementById('search-results').innerHTML = html;
+    document.getElementById('add-status-area').innerHTML = statusPickerHTML() + `<button class="btn btn-primary" onclick="doAddSearch()">등록하기</button>`;
+    document.getElementById('add-status-area').style.display = 'block';
+  } catch { document.getElementById('search-results').innerHTML = '<div class="loading">검색 중 오류가 발생했어요</div>'; }
+};
+
+window.selectResult = (i) => {
+  addSelected = window._searchResults[i];
+  document.querySelectorAll('.result-item').forEach((el,j) => el.classList.toggle('selected', i===j));
+};
+
+window.doAddSearch = async () => {
+  if (!addSelected) return;
+  const book = { ...addSelected, status: addStatus, rating: 0, id: Date.now() };
+  await saveBook(book); closeAdd();
+};
+
+window.doAddManual = async () => {
+  if (!addManual.title.trim()) return;
+  const book = { ...addManual, status: addStatus, rating: 0, id: Date.now() };
+  await saveBook(book); closeAdd();
+};
+
+window.openBook = (id) => {
+  activeBookId = id;
+  renderBookModal(id);
+  document.getElementById('book-modal').style.display = 'flex';
+};
+window.closeBook = () => {
+  document.getElementById('book-modal').style.display = 'none';
+  activeBookId = null;
+};
+
+function renderBookModal(id) {
+  const b = books.find(x => x.id == id);
+  if (!b) return;
+  const bookNotes = notes[id] || [];
+  const el = document.getElementById('book-modal-body');
+  el.innerHTML = `
+    <div style="display:flex;gap:14px;margin-bottom:16px">
+      <div class="book-cover-lg">${b.cover?`<img src="${b.cover}">`:'<span style="font-size:28px;opacity:.4">📖</span>'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:16px;font-weight:500">${b.title}</div>
+        ${b.author?`<div style="font-size:13px;color:var(--sub);margin-top:3px">${b.author}</div>`:''}
+        ${b.publisher?`<div style="font-size:12px;color:var(--mute);margin-top:2px">${b.publisher}</div>`:''}
+        <div style="margin-top:10px"><div style="font-size:11px;color:var(--mute);margin-bottom:5px">별점</div>
+        <div class="stars">${stars(b.rating||0, true, b.id)}</div></div>
+      </div>
+      <button class="close-btn" onclick="closeBook()">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--mute);margin-bottom:6px">독서 상태</div>
+    <div class="pill-row">${Object.keys(STATUS_LABEL).map(k=>`<div class="pill${b.status===k?' active-'+k:''}" onclick="changeStatus('${id}','${k}')">${STATUS_LABEL[k]}</div>`).join('')}</div>
+    <hr class="divider">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">노트 추가</div>
+    <div class="note-type-row">
+      <div class="note-pill active-quote" id="np-quote" onclick="setNoteType('quote')">인상 깊은 문구</div>
+      <div class="note-pill" id="np-thought" onclick="setNoteType('thought')">내 생각</div>
+    </div>
+    <input type="number" id="note-page" placeholder="페이지 (선택)">
+    <textarea id="note-text" rows="3" placeholder="내용을 입력하세요..."></textarea>
+    <button class="btn" onclick="doAddNote('${id}')">노트 저장</button>
+    ${bookNotes.length ? `<hr class="divider"><div style="font-size:12px;color:var(--mute);margin-bottom:8px">저장된 노트 (${bookNotes.length})</div>${bookNotes.map(n=>`
+      <div class="note-item" style="border-left:3px solid ${n.type==='quote'?'#9B72CF':'#4CAF7D'}">
+        <div class="note-meta">
+          <span style="color:${n.type==='quote'?'#9B72CF':'#4CAF7D'};font-weight:500">${n.type==='quote'?'문구':'생각'}</span>
+          ${n.page?`<span style="color:var(--mute)">p.${n.page}</span>`:''}
+          <span style="color:var(--mute);margin-left:auto">${n.date}</span>
+        </div>
+        <div class="note-text">${n.text}</div>
+      </div>`).join('')}` : ''}`;
+  window._noteType = 'quote';
+}
+
+window.changeStatus = async (id, status) => { await updateBook(id, { status }); };
+window.rateBook = async (id, rating) => { await updateBook(id, { rating }); };
+window.setNoteType = (t) => {
+  window._noteType = t;
+  document.getElementById('np-quote').className = 'note-pill' + (t==='quote'?' active-quote':'');
+  document.getElementById('np-thought').className = 'note-pill' + (t==='thought'?' active-thought':'');
+};
+window.doAddNote = async (id) => {
+  const text = document.getElementById('note-text')?.value?.trim();
+  if (!text) return;
+  const page = document.getElementById('note-page')?.value || '';
+  await saveNote(id, { type: window._noteType||'quote', text, page, date: new Date().toLocaleDateString('ko-KR') });
+  document.getElementById('note-text').value = '';
+  document.getElementById('note-page').value = '';
+};
+
+function showConfetti() {
+  const el = document.getElementById('confetti');
+  el.style.display = 'flex';
+  const colors = ['#F5C842','#4CAF7D','#9B72CF','#5B9BD5','#F08030'];
+  for (let i=0;i<60;i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    const size = 6 + Math.random()*8;
+    p.style.cssText = `left:${Math.random()*100}%;width:${size}px;height:${size}px;background:${colors[i%colors.length]};animation-duration:${1.5+Math.random()}s;animation-delay:${Math.random()*.8}s;border-radius:${size/4}px`;
+    el.appendChild(p);
+  }
+  setTimeout(() => { el.style.display='none'; el.querySelectorAll('.confetti-piece').forEach(p=>p.remove()); }, 3500);
+}
+
+document.getElementById('add-modal').addEventListener('click', e => { if(e.target===document.getElementById('add-modal')) closeAdd(); });
+</script>
+</body>
+</html>
