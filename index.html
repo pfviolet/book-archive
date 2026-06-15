@@ -448,13 +448,13 @@ window.handleSearchCover = (input) => {
 window.doAddSearch = async () => {
   if (!addSelected) return;
   const book = { ...addSelected, cover: window._searchCover || '', status: addStatus, rating: 0, id: Date.now() };
-  await saveBook(book); closeAdd();
+  await window.addBook(book); closeAdd();
 };
 
 window.doAddManual = async () => {
   if (!addManual.title.trim()) return;
   const book = { ...addManual, status: addStatus, rating: 0, id: Date.now() };
-  await saveBook(book); closeAdd();
+  await window.addBook(book); closeAdd();
 };
 
 window.openBook = (id) => {
@@ -568,7 +568,10 @@ window.openCalDay = async (dateKey) => {
           <span onclick="removeBookFromDay('${dateKey}','${b.id}')" style="cursor:pointer;color:var(--mute);font-size:16px;flex-shrink:0">✕</span>
         </div>`).join('') : '<div style="font-size:13px;color:var(--mute);padding:8px 0">아직 등록된 책이 없어요</div>'}
     </div>
-    <div style="font-size:12px;color:var(--mute);margin-bottom:8px">책 추가</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:12px;color:var(--mute)">책 추가</div>
+      <button onclick="openAddFromCal('${dateKey}')" style="padding:4px 10px;font-size:11px;border-radius:16px;border:1px solid var(--accent-b);background:var(--accent);color:var(--text);cursor:pointer;font-weight:500">+ 새 책 등록</button>
+    </div>
     <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
       ${books.filter(b => !dayBooks.find(db => db.id == b.id)).map(b => `
         <div onclick="addBookToDay('${dateKey}','${b.id}')" style="display:flex;gap:10px;padding:8px 10px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;cursor:pointer;align-items:center">
@@ -588,6 +591,25 @@ window.openCalDay = async (dateKey) => {
         : `<button class="btn btn-primary" onclick="addReadDate('${dateKey}')">📅 이날 읽음으로 표시</button>`}
     </div>`;
   modal.style.display = 'flex';
+};
+
+window.openAddFromCal = (dateKey) => {
+  document.getElementById('stat-modal').style.display = 'none';
+  window._calDateKey = dateKey;
+  addMode = null; addSelected = null; addStatus = "done";
+  addManual = { title:"", author:"", publisher:"", cover:"" };
+  renderAdd();
+  document.getElementById('add-modal').style.display = 'flex';
+};
+
+// 책 등록 완료 후 달력 날짜에도 자동 연결
+const _origAddBook = addBook;
+window.addBook = async (book) => {
+  await saveBook(book);
+  if (window._calDateKey) {
+    await addBookToDay(window._calDateKey, String(book.id));
+    window._calDateKey = null;
+  }
 };
 
 window.addBookToDay = async (dateKey, bookId) => {
