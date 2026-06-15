@@ -256,10 +256,16 @@ function render() {
   html += `<div class="section"><div class="section-title">📅 독서 달력</div>${calHTML()}</div>`;
   html += `<div class="section"><div class="section-title">📊 독서 통계</div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">이번 달 독서일</div><div class="stat-val">${monthCount}일</div></div>
-      <div class="stat-card"><div class="stat-label">올해 독서일</div><div class="stat-val">${yearCount}일</div></div>
-      <div class="stat-card"><div class="stat-label">완독한 책</div><div class="stat-val">${done.length}권</div></div>
-    </div></div>`;
+      <div class="stat-card" style="cursor:pointer" onclick="showStatDetail('month')"><div class="stat-label">이번 달 독서일</div><div class="stat-val">${monthCount}일</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="showStatDetail('year')"><div class="stat-label">올해 독서일</div><div class="stat-val">${yearCount}일</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="showStatDetail('done')"><div class="stat-label">완독한 책</div><div class="stat-val">${done.length}권</div></div>
+    </div></div>
+  <div class="overlay" id="stat-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal"><div class="modal-body">
+      <div class="modal-header"><h2 id="stat-modal-title"></h2><button class="close-btn" onclick="document.getElementById('stat-modal').style.display='none'">✕</button></div>
+      <div id="stat-modal-content"></div>
+    </div></div>
+  </div>`;
 
   if (done.length) html += `<div class="section"><div class="section-title">✅ 다 읽은 책</div><div class="scroll-row">${done.map(b=>bookCardHTML(b,true)).join('')}</div></div>`;
 
@@ -536,6 +542,55 @@ function showConfetti() {
 }
 
 document.getElementById('add-modal').addEventListener('click', e => { if(e.target===document.getElementById('add-modal')) closeAdd(); });
+
+window.showStatDetail = (type) => {
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const thisYear = String(now.getFullYear());
+  let title = '', list = [];
+  if (type === 'month') {
+    title = '이번 달 독서일';
+    const days = readDates.filter(d => d.startsWith(thisMonth));
+    const content = days.length
+      ? `<div style="display:flex;flex-direction:column;gap:6px">${days.map(d=>`<div style="padding:8px 12px;background:var(--accent-l);border-radius:8px;font-size:13px">📅 ${d}</div>`).join('')}</div>`
+      : '<div style="color:var(--mute);font-size:13px;text-align:center;padding:20px">이번 달 독서 기록이 없어요</div>';
+    document.getElementById('stat-modal-title').textContent = title;
+    document.getElementById('stat-modal-content').innerHTML = content;
+    document.getElementById('stat-modal').style.display = 'flex';
+    return;
+  }
+  if (type === 'year') {
+    title = '올해 독서일';
+    const days = readDates.filter(d => d.startsWith(thisYear));
+    const content = days.length
+      ? `<div style="display:flex;flex-direction:column;gap:6px">${days.map(d=>`<div style="padding:8px 12px;background:var(--accent-l);border-radius:8px;font-size:13px">📅 ${d}</div>`).join('')}</div>`
+      : '<div style="color:var(--mute);font-size:13px;text-align:center;padding:20px">올해 독서 기록이 없어요</div>';
+    document.getElementById('stat-modal-title').textContent = title;
+    document.getElementById('stat-modal-content').innerHTML = content;
+    document.getElementById('stat-modal').style.display = 'flex';
+    return;
+  }
+  if (type === 'done') {
+    title = '완독한 책';
+    list = books.filter(b => b.status === 'done');
+    const content = list.length
+      ? `<div style="display:flex;flex-direction:column;gap:8px">${list.map(b=>`
+          <div onclick="document.getElementById('stat-modal').style.display='none';openBook('${b.id}')" style="display:flex;gap:10px;padding:10px;background:var(--accent-l);border-radius:10px;cursor:pointer;align-items:center">
+            <div style="width:36px;height:50px;background:var(--card-b);border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center">
+              ${b.cover?`<img src="${b.cover}" style="width:100%;height:100%;object-fit:cover">`:'📖'}
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:500">${b.title}</div>
+              ${b.author?`<div style="font-size:12px;color:var(--sub)">${b.author}</div>`:''}
+              ${b.rating?`<div style="font-size:14px">${'★'.repeat(b.rating)}<span style="color:#D9CCAA">${'★'.repeat(5-b.rating)}</span></div>`:''}
+            </div>
+          </div>`).join('')}</div>`
+      : '<div style="color:var(--mute);font-size:13px;text-align:center;padding:20px">완독한 책이 없어요</div>';
+    document.getElementById('stat-modal-title').textContent = title;
+    document.getElementById('stat-modal-content').innerHTML = content;
+    document.getElementById('stat-modal').style.display = 'flex';
+  }
+};
 </script>
 </body>
 </html>
