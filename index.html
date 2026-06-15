@@ -324,22 +324,58 @@ function renderAdd() {
   if (addMode === 'manual') {
     el.innerHTML = `
       <button class="back-btn" onclick="setAddMode(null)">← 뒤로</button>
-      <input id="m-title" placeholder="제목 *" oninput="addManual.title=this.value">
-      <input id="m-author" placeholder="저자" oninput="addManual.author=this.value">
-      <input id="m-pub" placeholder="출판사" oninput="addManual.publisher=this.value">
-      <input id="m-cover" placeholder="표지 이미지 URL (선택)" oninput="addManual.cover=this.value">
+      <input id="m-title" placeholder="제목 *" value="${addManual.title}" oninput="addManual.title=this.value">
+      <input id="m-author" placeholder="저자" value="${addManual.author}" oninput="addManual.author=this.value">
+      <input id="m-pub" placeholder="출판사" value="${addManual.publisher}" oninput="addManual.publisher=this.value">
+      <div style="position:relative;margin-bottom:8px">
+        <input id="m-cover" placeholder="표지 이미지 URL (선택)" value="${addManual.cover}" oninput="addManual.cover=this.value" style="margin-bottom:0;padding-right:44px">
+        <label for="m-cover-file" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:18px;line-height:1" title="앨범에서 사진 선택">🖼️</label>
+        <input type="file" id="m-cover-file" accept="image/*" style="display:none" onchange="handleCoverFile(this)">
+      </div>
+      <div id="m-cover-preview" style="margin-bottom:8px;display:${addManual.cover?'block':'none'}">
+        <img id="m-cover-img" src="${addManual.cover}" style="width:70px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--card-b)">
+      </div>
       ${statusPickerHTML()}
       <button class="btn btn-primary" onclick="doAddManual()">등록하기</button>`;
   }
 }
 
+window.handleCoverFile = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    addManual.cover = e.target.result;
+    const urlInput = document.getElementById('m-cover');
+    if (urlInput) urlInput.value = '';
+    const preview = document.getElementById('m-cover-preview');
+    const img = document.getElementById('m-cover-img');
+    if (preview && img) { img.src = e.target.result; preview.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+};
+
 function statusPickerHTML() {
   return `<div style="font-size:11px;color:var(--mute);margin-bottom:6px">독서 상태</div>
-  <div class="pill-row">${Object.keys(STATUS_LABEL).map(k=>`<div class="pill${addStatus===k?' active-'+k:''}" onclick="setStatus('${k}')">${STATUS_LABEL[k]}</div>`).join('')}</div>`;
+  <div class="pill-row">${Object.keys(STATUS_LABEL).map(k=>`<div class="pill${addStatus===k?' active-'+k:''}" data-status="${k}" onclick="setStatus('${k}')">${STATUS_LABEL[k]}</div>`).join('')}</div>`;
 }
 
 window.setAddMode = (m) => { addMode = m; renderAdd(); };
-window.setStatus = (s) => { addStatus = s; renderAdd(); };
+window.setStatus = (s) => {
+  addStatus = s;
+  // 직접입력 모드일 때 입력값 보존
+  if (addMode === 'manual') {
+    addManual.title = document.getElementById('m-title')?.value || addManual.title;
+    addManual.author = document.getElementById('m-author')?.value || addManual.author;
+    addManual.publisher = document.getElementById('m-pub')?.value || addManual.publisher;
+    addManual.cover = document.getElementById('m-cover')?.value || addManual.cover;
+  }
+  // 상태 버튼만 다시 렌더링
+  document.querySelectorAll('.pill[data-status]').forEach(el => {
+    const s = el.dataset.status;
+    el.className = 'pill' + (addStatus === s ? ' active-' + s : '');
+  });
+};
 
 window.doSearch = async () => {
   const q = document.getElementById('sq')?.value?.trim();
