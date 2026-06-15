@@ -291,7 +291,7 @@ function calHTML() {
     const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isRead = dateSet.has(key);
     const isToday = d===now.getDate()&&calMonth===now.getMonth()&&calYear===now.getFullYear();
-    html += `<div class="cal-day" style="background:${isRead?'#F5C842':isToday?'#FEF9E0':'transparent'};color:${isRead?'#3A3020':isToday?'#7A6A40':'#3A3020'};border:${isToday?'1px solid #E8C93A':'none'}">${d}</div>`;
+    html += `<div class="cal-day" onclick="openCalDay('${key}')" style="cursor:pointer;background:${isRead?'#F5C842':isToday?'#FEF9E0':'transparent'};color:${isRead?'#3A3020':isToday?'#7A6A40':'#3A3020'};border:${isToday?'1px solid #E8C93A':'none'}">${d}</div>`;
   }
   html += '</div>';
   return html;
@@ -542,6 +542,88 @@ function showConfetti() {
 }
 
 document.getElementById('add-modal').addEventListener('click', e => { if(e.target===document.getElementById('add-modal')) closeAdd(); });
+
+window.openCalDay = async (dateKey) => {
+  const isRead = readDates.includes(dateKey);
+  // 그날 읽은 책 목록 (readLog에서 가져오기)
+  const logSnap = await getDocs(collection(db, "readLog"));
+  const logs = {};
+  logSnap.docs.forEach(d => { logs[d.id] = d.data().bookIds || []; });
+  const dayBooks = (logs[dateKey] || []).map(id => books.find(b => b.id == id)).filter(Boolean);
+
+  const modal = document.getElementById('stat-modal');
+  document.getElementById('stat-modal-title').textContent = `📅 ${dateKey}`;
+  document.getElementById('stat-modal-content').innerHTML = `
+    <div style="margin-bottom:12px">
+      <div style="font-size:12px;color:var(--mute);margin-bottom:8px">이날 읽은 책</div>
+      ${dayBooks.length ? dayBooks.map(b => `
+        <div style="display:flex;gap:10px;padding:8px 10px;background:var(--accent-l);border-radius:10px;margin-bottom:6px;align-items:center">
+          <div style="width:32px;height:44px;background:var(--card-b);border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            ${b.cover?`<img src="${b.cover}" style="width:100%;height:100%;object-fit:cover">`:'📖'}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.title}</div>
+            ${b.author?`<div style="font-size:11px;color:var(--sub)">${b.author}</div>`:''}
+          </div>
+          <span onclick="removeBookFromDay('${dateKey}','${b.id}')" style="cursor:pointer;color:var(--mute);font-size:16px;flex-shrink:0">✕</span>
+        </div>`).join('') : '<div style="font-size:13px;color:var(--mute);padding:8px 0">아직 등록된 책이 없어요</div>'}
+    </div>
+    <div style="font-size:12px;color:var(--mute);margin-bottom:8px">책 추가</div>
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
+      ${books.filter(b => !dayBooks.find(db => db.id == b.id)).map(b => `
+        <div onclick="addBookToDay('${dateKey}','${b.id}')" style="display:flex;gap:10px;padding:8px 10px;background:var(--card);border:1px solid var(--card-b);border-radius:10px;cursor:pointer;align-items:center">
+          <div style="width:32px;height:44px;background:var(--accent-l);border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            ${b.cover?`<img src="${b.cover}" style="width:100%;height:100%;object-fit:cover">`:'📖'}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.title}</div>
+            ${b.author?`<div style="font-size:11px;color:var(--sub)">${b.author}</div>`:''}
+          </div>
+          <span style="color:var(--accent);font-size:18px;flex-shrink:0">+</span>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:14px">
+      ${isRead
+        ? `<button class="btn" onclick="removeReadDate('${dateKey}')">📅 독서 기록 삭제</button>`
+        : `<button class="btn btn-primary" onclick="addReadDate('${dateKey}')">📅 이날 읽음으로 표시</button>`}
+    </div>`;
+  modal.style.display = 'flex';
+};
+
+window.addBookToDay = async (dateKey, bookId) => {
+  const logRef = doc(db, "readLog", dateKey);
+  const logSnap = await getDocs(collection(db, "readLog"));
+  const logs = {};
+  logSnap.docs.forEach(d => { logs[d.id] = d.data().bookIds || []; });
+  const cur = logs[dateKey] || [];
+  if (!cur.includes(bookId)) {
+    await setDoc(logRef, { bookIds: [...cur, bookId] });
+  }
+  if (!readDates.includes(dateKey)) await addReadDate(dateKey);
+  else openCalDay(dateKey);
+};
+
+window.removeBookFromDay = async (dateKey, bookId) => {
+  const logRef = doc(db, "readLog", dateKey);
+  const logSnap = await getDocs(collection(db, "readLog"));
+  const logs = {};
+  logSnap.docs.forEach(d => { logs[d.id] = d.data().bookIds || []; });
+  const cur = (logs[dateKey] || []).filter(id => id != bookId);
+  await setDoc(logRef, { bookIds: cur });
+  openCalDay(dateKey);
+};
+
+window.addReadDate = async (dateKey) => {
+  if (!readDates.includes(dateKey)) {
+    await setDoc(doc(db, "meta", "readDates"), { dates: [...readDates, dateKey] });
+  }
+  openCalDay(dateKey);
+};
+
+window.removeReadDate = async (dateKey) => {
+  await setDoc(doc(db, "meta", "readDates"), { dates: readDates.filter(d => d !== dateKey) });
+  document.getElementById('stat-modal').style.display = 'none';
+};
 
 window.showStatDetail = (type) => {
   const now = new Date();
