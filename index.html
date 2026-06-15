@@ -448,13 +448,21 @@ window.handleSearchCover = (input) => {
 window.doAddSearch = async () => {
   if (!addSelected) return;
   const book = { ...addSelected, cover: window._searchCover || '', status: addStatus, rating: 0, id: Date.now() };
-  await window.addBook(book); closeAdd();
+  await saveBook(book);
+  if (window._calDateKey) { await addBookToDay(window._calDateKey, String(book.id)); window._calDateKey = null; }
+  closeAdd();
 };
 
 window.doAddManual = async () => {
-  if (!addManual.title.trim()) return;
-  const book = { ...addManual, status: addStatus, rating: 0, id: Date.now() };
-  await window.addBook(book); closeAdd();
+  const title = addManual.title || document.getElementById('m-title')?.value?.trim();
+  if (!title) return;
+  const author = addManual.author || document.getElementById('m-author')?.value?.trim() || '';
+  const publisher = addManual.publisher || document.getElementById('m-pub')?.value?.trim() || '';
+  const cover = addManual.cover || document.getElementById('m-cover')?.value?.trim() || '';
+  const book = { title, author, publisher, cover, status: addStatus, rating: 0, id: Date.now() };
+  await saveBook(book);
+  if (window._calDateKey) { await addBookToDay(window._calDateKey, String(book.id)); window._calDateKey = null; }
+  closeAdd();
 };
 
 window.openBook = (id) => {
@@ -600,16 +608,6 @@ window.openAddFromCal = (dateKey) => {
   addManual = { title:"", author:"", publisher:"", cover:"" };
   renderAdd();
   document.getElementById('add-modal').style.display = 'flex';
-};
-
-// 책 등록 완료 후 달력 날짜에도 자동 연결
-const _origAddBook = addBook;
-window.addBook = async (book) => {
-  await saveBook(book);
-  if (window._calDateKey) {
-    await addBookToDay(window._calDateKey, String(book.id));
-    window._calDateKey = null;
-  }
 };
 
 window.addBookToDay = async (dateKey, bookId) => {
