@@ -381,29 +381,45 @@ window.doSearch = async () => {
   const q = document.getElementById('sq')?.value?.trim();
   if (!q) return;
   document.getElementById('search-results').innerHTML = '<div class="loading">검색 중...</div>';
+  document.getElementById('add-status-area').style.display = 'none';
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{ role:"user",
-        content:`한국 도서 검색: "${q}"\n다음 JSON 형식으로만 응답. 마크다운 없이 JSON만:\n[{"title":"제목","author":"저자","publisher":"출판사","cover":""}]\n실제 존재하는 한국 책 5권.` }] })
-    });
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&langRestrict=ko&maxResults=8&key=AIzaSyD-9tSrke72EmVAl3KIk-VMb_3bSMh2L4`;
+    const res = await fetch(url);
     const data = await res.json();
-    const text = data.content?.[0]?.text || "[]";
-    const results = JSON.parse(text.replace(/```json|```/g,"").trim());
-    if (!results.length) { document.getElementById('search-results').innerHTML = '<div class="loading">검색 결과가 없어요</div>'; return; }
+    let results = (data.items || []).map(item => ({
+      title: item.volumeInfo.title || '',
+      author: (item.volumeInfo.authors || []).join(', '),
+      publisher: item.volumeInfo.publisher || '',
+      cover: item.volumeInfo.imageLinks?.thumbnail?.replace('http://','https://') || '',
+    }));
+    if (!results.length) {
+      document.getElementById('search-results').innerHTML = '<div class="loading">검색 결과가 없어요. 직접 입력하기를 이용해주세요.</div>';
+      return;
+    }
+    window._searchResults = results;
     let html = '<div class="result-list">';
     results.forEach((r,i) => {
-      html += `<div class="result-item${addSelected?.title===r.title?' selected':''}" onclick="selectResult(${i})">
-        <div class="result-thumb">${r.cover?`<img src="${r.cover}">`:'📖'}</div>
+      html += `<div class="result-item" onclick="selectResult(${i})">
+        <div class="result-thumb">${r.cover?`<img src="${r.cover}" onerror="this.style.display='none'">`:'📖'}</div>
         <div><div style="font-size:13px;font-weight:500">${r.title}</div>${r.author?`<div style="font-size:12px;color:var(--sub)">${r.author}</div>`:''}${r.publisher?`<div style="font-size:11px;color:var(--mute)">${r.publisher}</div>`:''}</div>
       </div>`;
     });
     html += '</div>';
-    window._searchResults = results;
     document.getElementById('search-results').innerHTML = html;
-    document.getElementById('add-status-area').innerHTML = statusPickerHTML() + `<button class="btn btn-primary" onclick="doAddSearch()">등록하기</button>`;
+    document.getElementById('add-status-area').innerHTML = `
+      <div style="margin:10px 0 6px;font-size:11px;color:var(--mute)">표지 사진 직접 추가 (선택)</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <label for="s-cover-file" style="padding:6px 12px;border-radius:8px;border:1px solid var(--card-b);background:var(--accent-l);font-size:12px;cursor:pointer">🖼️ 앨범에서 선택</label>
+        <input type="file" id="s-cover-file" accept="image/*" style="display:none" onchange="handleSearchCover(this)">
+        <span id="s-cover-name" style="font-size:12px;color:var(--mute)"></span>
+      </div>
+      ${statusPickerHTML()}
+      <button class="btn btn-primary" onclick="doAddSearch()">등록하기</button>`;
     document.getElementById('add-status-area').style.display = 'block';
-  } catch { document.getElementById('search-results').innerHTML = '<div class="loading">검색 중 오류가 발생했어요</div>'; }
+    window._searchCover = '';
+  } catch(e) {
+    document.getElementById('search-results').innerHTML = '<div class="loading">검색 오류가 발생했어요. 직접 입력하기를 이용해주세요.</div>';
+  }
 };
 
 window.selectResult = (i) => {
@@ -411,9 +427,21 @@ window.selectResult = (i) => {
   document.querySelectorAll('.result-item').forEach((el,j) => el.classList.toggle('selected', i===j));
 };
 
+window.handleSearchCover = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    window._searchCover = e.target.result;
+    const nameEl = document.getElementById('s-cover-name');
+    if (nameEl) nameEl.textContent = '✅ ' + file.name;
+  };
+  reader.readAsDataURL(file);
+};
+
 window.doAddSearch = async () => {
   if (!addSelected) return;
-  const book = { ...addSelected, status: addStatus, rating: 0, id: Date.now() };
+  const book = { ...addSelected, cover: window._searchCover || '', status: addStatus, rating: 0, id: Date.now() };
   await saveBook(book); closeAdd();
 };
 
@@ -474,7 +502,11 @@ function renderBookModal(id) {
 }
 
 window.changeStatus = async (id, status) => { await updateBook(id, { status }); };
-window.rateBook = async (id, rating) => { await updateBook(id, { rating }); };
+window.rateBook = async (id, rating) => {
+  await updateDoc(doc(db, "books", String(id)), { rating });
+  const starsEl = document.getElementById('bm-stars');
+  if (starsEl) starsEl.innerHTML = starsHTML(rating, id);
+};
 window.setNoteType = (t) => {
   window._noteType = t;
   document.getElementById('np-quote').className = 'note-pill' + (t==='quote'?' active-quote':'');
